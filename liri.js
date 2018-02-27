@@ -1,108 +1,109 @@
 require("dotenv").config();
-//variable storing fs which is an acronym for File System
-var fs = require('fs');
-//variable storing omdb stuff
-var request = require('request');
-//variable storing twitter stuff
-var twitter = require('twitter');
-//variable storing spotify stuff
-var spotify = require('spotify');
-//variable storing the keys
-var keys = require('./keys.js').twitter;
-console.log(keys);
-
-var spotify = new Spotify(keys.spotify);
-var client = new Twitter(keys.twitter);
-//variable storing index 2 of the process.argv array for an actionable use later
+//gets the user inputted command to determine which case to run
 var action = process.argv[2];
-//variable storing index 3 of process.argv array for parameters to the action
-var arg = process.argv[3];
+//setting up packages
+var Twitter = require("twitter");
+var Spotify = require('node-spotify-api');
+var fs = require("fs");
+//getting other files and data from those files
+var keys = require("./keys.js");
 
-//get Tweets Function
-var getTweets = function getTweets() {
-  //using the twitter keys gather the last 20 tweets from my account
-  twitter(keys).get('statuses/user_timeline', 'count=20', function(error, tweets, response) {
-    // console.log last 20 tweets and when they were created
-    if (error) {
-      //if an error is thrown show this message
-      console.log('Couldn\'t access your tweets!');
-    } else {
-      //for each tweet log the timestamp and tweet message
-      tweets.forEach(function(tweet) {
-        console.log(tweet.created_at + ": " + tweet.text);
-      });
+var twitterKeysList = keys.twitter;
+var spotifyKeysList = keys.spotify;
+// console.log(twitterKeysList);
+// console.log(spotifyKeysList);
+
+liriSwitch(process.argv[2], process.argv[3]);
+
+function liriSwitch(action, subject) {
+    console.log(action);
+    console.log(subject);
+
+    switch (action) {
+        case "my-tweets":
+        	twitter();
+            break;
+
+        case "spotify-this-song":
+            spotify(subject);
+            break;
+
+        case "movie-this":
+            movies(subject);
+            break;
+
+        case "do-what-it-says":
+           
+            fs.readFile("random.txt", "utf8", function(error, data) {
+                if (error) {
+                    return console.log(error);
+                }
+                var dataArr = data.split(",");
+                action = dataArr[0];
+                subject = dataArr[1];
+                liriSwitch(action, subject);
+            })
+
+            break;
     }
-  });
-}
-//function retrieving songs from spotify
-var getSong = function getSong(song) {
-  //if song is undefined play "The Sign"
-  if (song === undefined) {
-      song = "The Sign";
-  }
-  //search spotify for the Track and song name
-  spotify.search({type: 'track', query: song }, function(error, response) {
-    if (error) {
-      //if error is thrown log this message
-      console.log('There was an issue finding that song', error);
-    } else {
-      // console.log(response);
-      //log all song data
-      response.tracks.items.forEach(function(song) {
-        console.log('Song name:', song.name);
-        console.log('Artist:', song.album.artists[0].name);
-        console.log('Spotify preview URL:', song.preview_url);
-        console.log('Album:', song.album.name);
-        console.log('---');
-      });
-    }
-  });
-}
-//variable storing find movie function
-var getMovie = function getMovie(movie) {
-  //if movie shows undefind retrieve "Mr. Nobody" as default
-  if (movie === undefined) {
-    movie = "Mr. Nobody";
-  }
-  //variable to search OMDB
-  var qUrl = 'http://www.omdbapi.com/?t=' + movie;
-  request(qUrl, function(error, response, body) {
-    if (error) {
-      console.log('There was an issue finding that movie', error);
-    } else {
-      //if no errors thrown log the following about the movie
-      //flick is the variable to store the JSON parse
-      flick = JSON.parse(body);
-      console.log('Title:', flick.Title);
-      console.log('Released:', flick.Year);
-      console.log('IMDB rating:', flick.Ratings[0].Value);
-      console.log('Country of origin:', flick.Country);
-      console.log('Language:', flick.Language);
-      console.log('Plot', flick.Plot);
-      console.log('Actors:', flick.Actors);
-      console.log('Rotten Tomatoes rating:', flick.Ratings[1].Value);
-    }
-  });
 }
 
-var doThing = function doThing() {
-  // get arguments from random.text
-  var randAction, randArgument;
-  //pull data from random.txt file
-  fs.readFile('./random.txt', 'utf-8', function(error, data) {
-    //split the data into an array
-    var arr = data.split(',');
-    randAction = arr[0];
-    randArgument = arr[1];
-    actions[randAction](randArgument);
-  });
-}
-//these are the commands to run the search parameters
-var actions = {
-  'my-tweets': getTweets,
-  'spotify-this-song': getSong,
-  'movie-this': getMovie,
-  'do-what-it-says': doThing
+function twitter() {
+    var client = new Twitter(twitterKeysList);
+    client.get('statuses/user_timeline', { screen_name: 'Khalador34', count: 20 }, function(error, tweets, response) {
+        if (error) {
+            error
+        } else {
+            for (i = 0; i < tweets.length; i++) {
+                console.log(tweets[i].text);
+                fs.appendFile("random.txt", tweets[i].text +"\n",function(err){
+                	if (err){
+                		console.log(err);
+                	}
+                });
+
+            }
+        }
+    });
 }
 
-actions[action](arg);
+function spotify(songName) {
+    var spotify = new Spotify(spotifyKeysList);
+
+    if (!songName) {
+        console.log("Artist(s): Ace of Base");
+        console.log("Song Name: The Sign");
+    } else {
+        spotify.search({ type: 'track', query: songName }, function(err, data) {
+            if (err) {
+                console.log('Error occurred: ' + err);
+                return;
+            }
+            var songInfo = data.tracks.items[0];
+            // console.log(songInfo);
+            console.log("Artist(s): " + songInfo.artists[0].name);
+            console.log("Song Name: " + songInfo.name);
+            console.log("Spotify Link Preview: " + songInfo.preview_url);
+            console.log("Album: " + songInfo.album.name);
+        });
+    }
+};
+
+function movies(movieName) {
+    var request = require('request');
+    console.log(movieName);
+    request('http://www.omdbapi.com/?t=' + movieName + '&apikey=40e9cece', function(error, response, body) {
+        if (error) {
+            console.log('Error occurred: ' + error);
+        } else {
+            console.log("Title: " + JSON.parse(body).Title);
+            console.log("Year of Release: " + JSON.parse(body).Year);
+            console.log("IMDB Rating: " + JSON.parse(body).Ratings[0].Value);
+            console.log("Country of Production: " + JSON.parse(body).Country);
+            console.log("Language: " + JSON.parse(body).Language);
+            console.log("Plot: " + JSON.parse(body).Plot);
+            console.log("Actors: " + JSON.parse(body).Actors);
+            console.log("Rotten Tomatoes Rating: " + JSON.parse(body).Ratings[1].Value);
+        }
+    });
+};
